@@ -1,0 +1,100 @@
+---
+title: "NYPD Incident Shooting Report"
+author: "X.Song"
+date: "2025-09-15"
+output: pdf_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+## Introduction
+
+This report analyzes the NYPD Shooting Incient Dataset, which contains records of shooting incidents in New York City. The analysis includes data cleaning, exploratory visualization, and modeling to identify patterns and trends in shooting incidents. 
+
+Data Import and Tidying
+
+```{r data_import}
+library(tidyverse)
+library(lubridate)
+library(ggmap)
+library(ggplot2)
+library(gmodels)
+
+shooting_data <- read.csv("https://data.cityofnewyork.us/api/views/5ucz-vwe8/rows.csv")
+
+glimpse(shooting_data)
+```
+
+### Exploratory Data Analysis
+
+```{r data_cleaning}
+cleaned_data <- shooting_data %>%
+  mutate(
+    OCCUR_DATE = mdy(OCCUR_DATE),
+    OCCUR_TIME = hms(OCCUR_TIME),
+    HOUR = hour(OCCUR_TIME),
+    MONTH = month(OCCUR_DATE, label = TRUE),
+    DAY_OF_WEEK = wday(OCCUR_DATE, label = TRUE),
+   ) %>%
+  filter(!is.na(Latitude) & !is.na(Longitude)) %>%
+  distinct()
+
+summary(cleaned_data %>% 
+    select(HOUR, MONTH, DAY_OF_WEEK, PERP_AGE_GROUP, VIC_AGE_GROUP))
+```
+
+## Visualization Shooting Incidents by Time of Day
+
+```{r fig.height=5, fig.width=7}
+ggplot(cleaned_data, aes(x = HOUR)) +
+geom_histogram(binwidth = 1, fill = "steelblue", color = "black") +
+labs(
+       title = "Shooting Incidents by Hour of Day",
+       x = "Hour of Day",
+       y = "Number of Incidents"
+  ) +
+ theme_minimal()
+```
+
+## Visualization Racial Disparities in Shooting Victims Across NYC Boroughs
+
+```{r borough_race_plot, fig.height=6, fig.width=8, message=FALSE, warning=FALSE}
+ggplot(cleaned_data, aes(x = BORO, fill = VIC_RACE)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Shooting Incidents by Borough and Victim Race",
+       x = "Borough",
+       y = "Number of Incidents",
+       fill = "Victim Race") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Predicting Shooting Fatality Outcomes in NYC: A Logistic Regression Analysis of Victim Demographics and incident Characteristics
+
+```{r data_model}
+model_data <- cleaned_data %>%
+  mutate(FATALITY = if_else(STATISTICAL_MURDER_FLAG == "TRUE", 1, 0))
+fatality_model <- glm(FATALITY ~ VIC_AGE_GROUP + VIC_SEX + VIC_RACE + BORO + HOUR,
+                     data = model_data,
+                     family = "binomial")
+summary(fatality_model)
+```
+
+## Potential Biases and Limitations
+
+Reporting Bias: The data only includes reported incidents. There may be shootings that were not reported to or recorded by the NYPD.
+
+Demographic Bias: The race/ethnicity data may be incomplete or subject to reporting officer bias.
+
+Geographic Bias: Some neighborhoods may have more police presence leading to higher reporting rates.
+
+Temporal Bias: The "Year-to-Date" nature means the data isn't a complete year and may not represent seasonal patterns.
+
+Model Limitations: Our logistic regression makes simplifying assumptions and doesn't account for all potential confounding variables.
+
+### Conclusion
+
+This report summarizes NYPD shooting incident data, examining patterns by borough and over time. A simple logistic regression model was used, but the data has limitations and potential biases. A deeper, more advanced analysis would provide better insights into these issues.
